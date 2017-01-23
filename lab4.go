@@ -4,20 +4,35 @@ type Token struct {
 	data string
 	recipient int
 }
-func grtn(i int, n int, t Token, c chan string) {
-	fmt.Println("Thread", i, "is running")
-    	if (i == t.recipient) {
-		c<-"Thread " + strconv.Itoa(i) + " got " + t.data
-		go grtn(i+1, n, t, c)
-	} else if (i < n) {
-		go grtn(i+1, n, t, c)
+type Chain struct {
+	i int
+	ch chan Token
+	next *Chain
+}
+func grtn(chain Chain, c chan string) {
+	fmt.Println("Tread ", chain.i, " running")
+	t := <-chain.ch
+	if chain.i == t.recipient {
+		c <-"Thread " + strconv.Itoa(chain.i) + " got " + t.data
+	} else if chain.next != nil {
+		chain.next.ch <- t
+	} else {
+		c <-"Wrong addresse"
 	}
 }
 func main() {
-	c := make(chan string)
 	N := 10
-	dstn := 6
-	t := Token{"a message", dstn}
-	go grtn(1, N, t, c)
+	chain := make([]Chain, N)
+	c := make(chan string)
+	for i := N - 1; i >= 0; i-- {
+		channel := make(chan Token)
+		if i == N - 1 {
+			chain[i] = Chain{i, channel, nil}
+		} else {
+			chain[i] = Chain{i, channel, &chain[i+1]}
+		}	
+		go grtn(chain[i], c)
+	}
+	chain[0].ch <- Token{"a message", 5}
 	fmt.Println(<-c)
 }
